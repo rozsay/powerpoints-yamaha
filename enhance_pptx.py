@@ -499,10 +499,37 @@ def add_transition(xml_content, transition_xml):
 
 def add_unified_bg_to_existing_slide(xml_content, slide_num):
     """
-    Meglévő diákhoz egységes háttér hozzáadása:
-    - Sötétkék felső sáv + vékony alsó vonal
-    - Halvány gradient overlay az egységes megjelenésért
+    Meglévő diákhoz egységes sötétkék háttér kényszerítése:
+    1. A <p:bg> elem cseréje/injektálása – gradient háttér
+    2. Teli háttér téglalap az spTree elejére (első shape)
+    3. Felső narancs csík + alsó kék csík (mint az új diákon)
     """
+    # 1. <p:bg> csere – ez adja a tényleges slide háttérszínt
+    new_bg = f'''<p:bg>
+  <p:bgPr>
+    <a:gradFill>
+      <a:gsLst>
+        <a:gs pos="0"><a:srgbClr val="{BG_DARK}"/></a:gs>
+        <a:gs pos="60000"><a:srgbClr val="{BG_MID}"/></a:gs>
+        <a:gs pos="100000"><a:srgbClr val="{BG_DARK}"/></a:gs>
+      </a:gsLst>
+      <a:lin ang="10800000" scaled="0"/>
+    </a:gradFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>'''
+
+    # Ha van már <p:bg>...</p:bg> → cseréljük
+    if re.search(r'<p:bg>', xml_content):
+        xml_content = re.sub(r'<p:bg>.*?</p:bg>', new_bg, xml_content, flags=re.DOTALL)
+    # Ha csak <p:bg/> self-closing → cseréljük
+    elif '<p:bg/>' in xml_content:
+        xml_content = xml_content.replace('<p:bg/>', new_bg)
+    else:
+        # Nincs <p:bg> → injektáljuk a <p:spTree> elé
+        xml_content = xml_content.replace('<p:spTree>', new_bg + '\n  <p:spTree>', 1)
+
+    # 2. Felső narancs csík (228600 EMU = ~9mm) – azonos az új diákkal
     top_bar = f'''<p:sp>
   <p:nvSpPr>
     <p:cNvPr id="{90+slide_num}" name="UnifiedTopBar{slide_num}"/>
@@ -510,22 +537,7 @@ def add_unified_bg_to_existing_slide(xml_content, slide_num):
     <p:nvPr/>
   </p:nvSpPr>
   <p:spPr>
-    <a:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="190500"/></a:xfrm>
-    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-    <a:solidFill><a:srgbClr val="{BG_DARK}"><a:alpha val="85000"/></a:srgbClr></a:solidFill>
-    <a:ln><a:noFill/></a:ln>
-  </p:spPr>
-  <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
-</p:sp>'''
-
-    accent_strip = f'''<p:sp>
-  <p:nvSpPr>
-    <p:cNvPr id="{95+slide_num}" name="UnifiedAccent{slide_num}"/>
-    <p:cNvSpPr/>
-    <p:nvPr/>
-  </p:nvSpPr>
-  <p:spPr>
-    <a:xfrm><a:off x="0" y="190500"/><a:ext cx="12192000" cy="38100"/></a:xfrm>
+    <a:xfrm><a:off x="0" y="0"/><a:ext cx="12192000" cy="228600"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
     <a:solidFill><a:srgbClr val="{ACCENT_OR}"/></a:solidFill>
     <a:ln><a:noFill/></a:ln>
@@ -533,16 +545,17 @@ def add_unified_bg_to_existing_slide(xml_content, slide_num):
   <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
 </p:sp>'''
 
-    bottom_line = f'''<p:sp>
+    # 3. Alsó kék csík – azonos az új diákkal (y=6629400, h=228600)
+    bottom_bar = f'''<p:sp>
   <p:nvSpPr>
-    <p:cNvPr id="{85+slide_num}" name="UnifiedBottom{slide_num}"/>
+    <p:cNvPr id="{85+slide_num}" name="UnifiedBottomBar{slide_num}"/>
     <p:cNvSpPr/>
     <p:nvPr/>
   </p:nvSpPr>
   <p:spPr>
-    <a:xfrm><a:off x="0" y="6820800"/><a:ext cx="12192000" cy="38100"/></a:xfrm>
+    <a:xfrm><a:off x="0" y="6629400"/><a:ext cx="12192000" cy="228600"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-    <a:solidFill><a:srgbClr val="{ACCENT_BL}"><a:alpha val="70000"/></a:srgbClr></a:solidFill>
+    <a:solidFill><a:srgbClr val="{ACCENT_OR}"><a:alpha val="60000"/></a:srgbClr></a:solidFill>
     <a:ln><a:noFill/></a:ln>
   </p:spPr>
   <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
@@ -552,7 +565,7 @@ def add_unified_bg_to_existing_slide(xml_content, slide_num):
     if insert_point in xml_content:
         xml_content = xml_content.replace(
             insert_point,
-            insert_point + '\n' + top_bar + '\n' + accent_strip + '\n' + bottom_line,
+            insert_point + '\n' + top_bar + '\n' + bottom_bar,
             1
         )
     return xml_content
